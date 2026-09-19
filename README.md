@@ -149,7 +149,37 @@ processed_event + daily_balance
 
 ---
 
-## 5. Padrões aplicados
+## 5. Guia visual da arquitetura
+
+As figuras abaixo resumem as decisões principais do case. Elas são complementares ao texto e representam somente o estado final da solução entregue.
+
+### 5.1 Do negócio ao sistema — BIAN 14, DDD e solução
+
+![Visão geral do negócio, BIAN 14, DDD e arquitetura](assets/architecture/01-bian-overview.svg)
+
+### 5.2 DDD estratégico e tático
+
+![DDD estratégico e tático aplicado ao Cash Flow / Position Keeping](assets/architecture/02-ddd.svg)
+
+### 5.3 Arquitetura Hexagonal e microserviços
+
+![Arquitetura Hexagonal, Ports and Adapters e separação dos deployables](assets/architecture/03-hexagonal-microservices.svg)
+
+### 5.4 CQRS, eventos e Transactional Outbox
+
+![CQRS light, RabbitMQ e Transactional Outbox](assets/architecture/04-cqrs-outbox.svg)
+
+### 5.5 Persistência e projeções
+
+![Fonte de verdade, schemas PostgreSQL e DailyBalance](assets/architecture/05-data-projections.svg)
+
+### 5.6 Segurança, observabilidade e testes
+
+![OAuth2, OpenTelemetry, métricas, E2E e performance](assets/architecture/06-security-observability-tests.svg)
+
+---
+
+## 7. Padrões aplicados
 
 ### Hexagonal / Ports & Adapters
 
@@ -211,7 +241,7 @@ O consolidado converge de forma assíncrona.
 
 ---
 
-## 6. Resiliência
+## 7. Resiliência
 
 Se o serviço de consolidação ficar indisponível:
 
@@ -237,7 +267,7 @@ O consumer utiliza retry limitado com backoff antes de DLQ.
 
 ---
 
-## 7. Reversão / estorno
+## 8. Reversão / estorno
 
 Um lançamento confirmado nunca é alterado.
 
@@ -264,7 +294,7 @@ A operação também utiliza `Idempotency-Key`.
 
 ---
 
-## 8. Persistência
+## 9. Persistência
 
 PostgreSQL 16 com um banco `cashflow` e dois schemas lógicos:
 
@@ -295,7 +325,7 @@ America/Sao_Paulo
 
 ---
 
-## 9. Segurança
+## 10. Segurança
 
 As APIs utilizam OAuth2 Resource Server / JWT.
 
@@ -311,7 +341,7 @@ No ambiente local existe um IdP mock apenas para permitir execução reproduzív
 
 ---
 
-## 10. Observabilidade
+## 11. Observabilidade
 
 Implementado:
 
@@ -342,7 +372,7 @@ cashflow_rabbitmq_queue_depth
 
 ---
 
-## 11. Reconciliação
+## 12. Reconciliação
 
 O write model é a fonte de verdade.
 
@@ -366,7 +396,7 @@ Qualquer divergência retorna erro.
 
 ---
 
-## 12. Stack
+## 13. Stack
 
 | Componente | Tecnologia |
 |---|---|
@@ -385,7 +415,7 @@ Qualquer divergência retorna erro.
 
 ---
 
-## 13. Pré-requisitos
+## 14. Pré-requisitos
 
 Para executar localmente:
 
@@ -398,7 +428,7 @@ Java/Maven não são necessários para subir a aplicação via Docker; são nece
 
 ---
 
-## 14. Subir a aplicação
+## 15. Subir a aplicação
 
 ### 1. Criar credenciais locais
 
@@ -431,7 +461,7 @@ export TOKEN
 
 ---
 
-## 15. Executar validação funcional
+## 16. Executar validação funcional
 
 Fluxo principal:
 
@@ -467,7 +497,7 @@ sh scripts/reconcile-balances.sh
 
 ---
 
-## 16. Performance — requisito de 50 req/s
+## 17. Performance — requisito de 50 req/s
 
 O teste usa k6 com `constant-arrival-rate`, evitando confundir número de usuários virtuais com taxa real de requisições.
 
@@ -499,7 +529,7 @@ O gate contratual continua sendo o baseline de 50 req/s.
 
 ---
 
-## 17. Pipelines
+## 18. Pipelines
 
 Três workflows principais:
 
@@ -530,7 +560,7 @@ Executa automaticamente o baseline de 50 req/s e publica a evidência do k6 como
 
 ---
 
-## 18. Endpoints principais
+## 19. Endpoints principais
 
 ```http
 POST /v1/transactions
@@ -543,7 +573,7 @@ GET  /v1/merchants/{merchantId}/daily-balances/{date}?currency=BRL
 
 ---
 
-## 19. Interfaces locais
+## 20. Interfaces locais
 
 Após `docker compose up`:
 
@@ -557,7 +587,7 @@ Após `docker compose up`:
 
 ---
 
-## 20. Arquitetura alvo
+## 21. Arquitetura alvo
 
 A aplicação foi mantida independente do provedor de cloud.
 
@@ -581,7 +611,7 @@ Azure Service Bus e Google Pub/Sub não são tratados como substitutos transpare
 
 ---
 
-## 21. Encerrar o ambiente
+## 22. Encerrar o ambiente
 
 ```bash
 docker compose down -v
