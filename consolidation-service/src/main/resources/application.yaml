@@ -1,0 +1,70 @@
+server:
+  port: ${SERVER_PORT:8082}
+spring:
+  application:
+    name: consolidation-service
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/cashflow?currentSchema=consolidation}
+    username: ${DB_USER:consolidation_app}
+    password: ${DB_PASSWORD}
+    hikari:
+      connection-timeout: ${DB_CONNECTION_TIMEOUT_MS:5000}
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:10}
+  flyway:
+    default-schema: consolidation
+    schemas: consolidation
+    create-schemas: false
+    clean-disabled: true
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    listener:
+      simple:
+        acknowledge-mode: auto
+        observation-enabled: true
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          max-attempts: ${RABBITMQ_CONSUMER_MAX_ATTEMPTS:3}
+          initial-interval: ${RABBITMQ_CONSUMER_RETRY_INITIAL_MS:500}
+          multiplier: ${RABBITMQ_CONSUMER_RETRY_MULTIPLIER:2.0}
+          max-interval: ${RABBITMQ_CONSUMER_RETRY_MAX_MS:2000}
+cashflow:
+  security:
+    enabled: ${SECURITY_ENABLED:false}
+    jwt-issuer-uri: ${JWT_ISSUER_URI:}
+  messaging:
+    exchange: cashflow.events
+    routing-key: financial.transaction.recorded
+    queue: financial.transactions.recorded
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING:1.0}
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318/v1/traces}
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+
+logging:
+  level:
+    root: INFO
+    org.springframework: WARN
+    org.apache: WARN
+    com.zaxxer.hikari: WARN
+  pattern:
+    console: "%d{HH:mm:ss.SSS} %-5level [${spring.application.name}] [trace=%X{traceId:-} span=%X{spanId:-}] %msg%n"
