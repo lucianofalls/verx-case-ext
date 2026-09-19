@@ -1,20 +1,66 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
-<style>
-  .bg{fill:#f6fbff}.h{fill:#0b3b74}.t{font-family:Arial,sans-serif;fill:#0f2742}.w{fill:white}.b{fill:#e8f3ff;stroke:#2d6fb7;stroke-width:2}.g{fill:#e9f8ef;stroke:#2e8b57;stroke-width:2}.y{fill:#fff6d8;stroke:#d7a600;stroke-width:2}.p{fill:#f1eaff;stroke:#6d4bc3;stroke-width:2}.title{font-size:42px;font-weight:700;fill:white}.sub{font-size:24px;fill:#dfefff}.box{font-size:25px;font-weight:700}.small{font-size:20px}.arrow{stroke:#244a73;stroke-width:6;marker-end:url(#a)}
-</style><defs><marker id="a" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#244a73"/></marker></defs>
-<rect class="bg" width="1600" height="900"/><rect class="h" width="1600" height="110"/>
-<text class="title" x="55" y="65">Visão Geral — Negócio, BIAN 14, DDD e Arquitetura</text>
-<text class="sub" x="55" y="98">Controle de Fluxo de Caixa: do problema do comerciante até a solução executável</text>
-<rect class="b" x="65" y="165" rx="22" width="320" height="150"/><text class="t box" x="105" y="215">Necessidade</text><text class="t small" x="105" y="260">Registrar créditos/débitos</text><text class="t small" x="105" y="292">Consultar saldo diário</text>
-<rect class="y" x="465" y="165" rx="22" width="330" height="150"/><text class="t box" x="505" y="215">Capabilities do case</text><text class="t small" x="505" y="260">Financial Entry Management</text><text class="t small" x="505" y="292">Financial Position Management</text>
-<rect class="g" x="875" y="165" rx="22" width="300" height="150"/><text class="t box" x="915" y="215">BIAN 14</text><text class="t small" x="915" y="260">Service Domain</text><text class="t small" x="915" y="292">Position Keeping</text>
-<rect class="p" x="1255" y="165" rx="22" width="280" height="150"/><text class="t box" x="1295" y="215">DDD</text><text class="t small" x="1295" y="260">Cash Flow /</text><text class="t small" x="1295" y="292">Position Keeping</text>
-<line class="arrow" x1="385" y1="240" x2="455" y2="240"/><line class="arrow" x1="795" y1="240" x2="865" y2="240"/><line class="arrow" x1="1175" y1="240" x2="1245" y2="240"/>
-<rect class="w" x="120" y="400" rx="25" width="1360" height="360" stroke="#b9cde4" stroke-width="2"/>
-<text class="t box" x="170" y="455">Como isso vira software</text>
-<rect class="b" x="170" y="510" rx="18" width="300" height="150"/><text class="t box" x="210" y="560">transaction-service</text><text class="t small" x="210" y="605">Command / write side</text><text class="t small" x="210" y="635">Lançamentos + Outbox</text>
-<rect class="g" x="650" y="510" rx="18" width="300" height="150"/><text class="t box" x="690" y="560">RabbitMQ</text><text class="t small" x="690" y="605">Eventos assíncronos</text><text class="t small" x="690" y="635">CloudEvents</text>
-<rect class="p" x="1130" y="510" rx="18" width="300" height="150"/><text class="t box" x="1170" y="560">consolidation-service</text><text class="t small" x="1170" y="605">Read / projection side</text><text class="t small" x="1170" y="635">DailyBalance</text>
-<line class="arrow" x1="470" y1="585" x2="640" y2="585"/><line class="arrow" x1="950" y1="585" x2="1120" y2="585"/>
-<text class="t small" x="170" y="720">BIAN é referência semântica; DDD define a fronteira do modelo; os dois serviços são deployables do mesmo Bounded Context.</text>
+<defs>
+ <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f8fbff"/><stop offset="1" stop-color="#edf5ff"/></linearGradient>
+ <linearGradient id="red" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#ff4b4b"/><stop offset="1" stop-color="#d91f26"/></linearGradient>
+ <linearGradient id="blue" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#2488ff"/><stop offset="1" stop-color="#0866cc"/></linearGradient>
+ <linearGradient id="green" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#16b968"/><stop offset="1" stop-color="#078d4c"/></linearGradient>
+ <filter id="shadow"><feDropShadow dx="0" dy="8" stdDeviation="8" flood-opacity=".18"/></filter>
+</defs>
+<rect width="1600" height="900" fill="url(#bg)"/>
+<text x="800" y="75" text-anchor="middle" font-family="Arial" font-weight="700" font-size="48" fill="#0b2d5c">Visão de Negócio do Case</text>
+<text x="800" y="118" text-anchor="middle" font-family="Arial" font-size="25" fill="#52657f">Da necessidade do comerciante às capabilities que geram valor</text>
+
+<!-- lego card 1 -->
+<g filter="url(#shadow)">
+<rect x="55" y="195" width="430" height="440" rx="28" fill="url(#red)"/>
+<circle cx="135" cy="195" r="24" fill="#ff6969"/><circle cx="240" cy="195" r="24" fill="#ff6969"/><circle cx="345" cy="195" r="24" fill="#ff6969"/><circle cx="450" cy="195" r="24" fill="#ff6969"/>
+<rect x="85" y="290" width="370" height="300" rx="22" fill="white" opacity=".96"/>
+</g>
+<circle cx="135" cy="255" r="36" fill="#ffd34f"/><circle cx="135" cy="245" r="15" fill="#784421"/><rect x="118" y="260" width="34" height="35" rx="8" fill="#1c74d9"/>
+<text x="200" y="265" font-family="Arial" font-size="31" font-weight="700" fill="white">Necessidade</text>
+<text x="200" y="301" font-family="Arial" font-size="31" font-weight="700" fill="white">do comerciante</text>
+<text x="115" y="355" font-family="Arial" font-size="23" font-weight="700" fill="#14345d">↕ Registrar créditos e débitos</text>
+<text x="115" y="420" font-family="Arial" font-size="23" font-weight="700" fill="#14345d">▥ Consultar saldo diário</text>
+<text x="115" y="452" font-family="Arial" font-size="23" font-weight="700" fill="#14345d">   consolidado</text>
+<text x="115" y="520" font-family="Arial" font-size="23" font-weight="700" fill="#14345d">⚙ Manter operação mesmo</text>
+<text x="115" y="552" font-family="Arial" font-size="23" font-weight="700" fill="#14345d">   com falha no consolidado</text>
+
+<!-- arrow -->
+<path d="M500 410 H555 L555 370 L625 440 L555 510 L555 470 H500 Z" fill="#9aa9ba"/>
+
+<!-- card 2 -->
+<g filter="url(#shadow)">
+<rect x="620" y="195" width="430" height="440" rx="28" fill="url(#blue)"/>
+<circle cx="700" cy="195" r="24" fill="#55a3ff"/><circle cx="805" cy="195" r="24" fill="#55a3ff"/><circle cx="910" cy="195" r="24" fill="#55a3ff"/><circle cx="1015" cy="195" r="24" fill="#55a3ff"/>
+<rect x="650" y="290" width="370" height="300" rx="22" fill="white" opacity=".96"/>
+</g>
+<text x="700" y="255" font-family="Arial" font-size="34" font-weight="700" fill="white">Business Capabilities</text>
+<rect x="690" y="330" width="290" height="70" rx="14" fill="#e9f8ef"/><text x="720" y="374" font-family="Arial" font-size="22" font-weight="700" fill="#0a5b34">Financial Entry Management</text>
+<rect x="690" y="420" width="290" height="70" rx="14" fill="#fff4cc"/><text x="710" y="464" font-family="Arial" font-size="22" font-weight="700" fill="#7a5700">Financial Position Management</text>
+<rect x="690" y="510" width="290" height="70" rx="14" fill="#f0e8ff"/><text x="735" y="554" font-family="Arial" font-size="22" font-weight="700" fill="#4f318c">Operational Resilience</text>
+
+<path d="M1065 410 H1120 L1120 370 L1190 440 L1120 510 L1120 470 H1065 Z" fill="#9aa9ba"/>
+
+<!-- card 3 -->
+<g filter="url(#shadow)">
+<rect x="1185" y="195" width="360" height="440" rx="28" fill="url(#green)"/>
+<circle cx="1260" cy="195" r="24" fill="#46ce89"/><circle cx="1365" cy="195" r="24" fill="#46ce89"/><circle cx="1470" cy="195" r="24" fill="#46ce89"/>
+<rect x="1215" y="290" width="300" height="300" rx="22" fill="white" opacity=".96"/>
+</g>
+<text x="1255" y="260" font-family="Arial" font-size="34" font-weight="700" fill="white">Valor gerado</text>
+<text x="1255" y="350" font-family="Arial" font-size="23" font-weight="700" fill="#14345d">● Controle diário do caixa</text>
+<text x="1255" y="415" font-family="Arial" font-size="23" font-weight="700" fill="#14345d">● Confiabilidade</text>
+<text x="1255" y="480" font-family="Arial" font-size="23" font-weight="700" fill="#14345d">● Escalabilidade</text>
+<text x="1255" y="545" font-family="Arial" font-size="23" font-weight="700" fill="#14345d">● Rastreabilidade</text>
+
+<!-- bottom blocks -->
+<text x="800" y="710" text-anchor="middle" font-family="Arial" font-size="25" font-weight="700" fill="#17365d">Capabilities que se encaixam para montar valor para o negócio</text>
+<g filter="url(#shadow)">
+<rect x="420" y="755" width="210" height="95" rx="12" fill="#12a95f"/><circle cx="470" cy="755" r="16" fill="#3ed27f"/><circle cx="575" cy="755" r="16" fill="#3ed27f"/>
+<rect x="695" y="755" width="210" height="95" rx="12" fill="#f3b300"/><circle cx="745" cy="755" r="16" fill="#ffd448"/><circle cx="850" cy="755" r="16" fill="#ffd448"/>
+<rect x="970" y="755" width="210" height="95" rx="12" fill="#6e45c7"/><circle cx="1020" cy="755" r="16" fill="#936de1"/><circle cx="1125" cy="755" r="16" fill="#936de1"/>
+</g>
+<text x="525" y="802" text-anchor="middle" font-family="Arial" font-size="18" font-weight="700" fill="white">FINANCIAL ENTRY</text><text x="525" y="827" text-anchor="middle" font-family="Arial" font-size="18" font-weight="700" fill="white">MANAGEMENT</text>
+<text x="800" y="802" text-anchor="middle" font-family="Arial" font-size="18" font-weight="700" fill="white">FINANCIAL POSITION</text><text x="800" y="827" text-anchor="middle" font-family="Arial" font-size="18" font-weight="700" fill="white">MANAGEMENT</text>
+<text x="1075" y="802" text-anchor="middle" font-family="Arial" font-size="18" font-weight="700" fill="white">OPERATIONAL</text><text x="1075" y="827" text-anchor="middle" font-family="Arial" font-size="18" font-weight="700" fill="white">RESILIENCE</text>
 </svg>
