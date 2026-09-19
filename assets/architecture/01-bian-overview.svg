@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+<style>
+  .bg{fill:#f6fbff}.h{fill:#0b3b74}.t{font-family:Arial,sans-serif;fill:#0f2742}.w{fill:white}.b{fill:#e8f3ff;stroke:#2d6fb7;stroke-width:2}.g{fill:#e9f8ef;stroke:#2e8b57;stroke-width:2}.y{fill:#fff6d8;stroke:#d7a600;stroke-width:2}.p{fill:#f1eaff;stroke:#6d4bc3;stroke-width:2}.title{font-size:42px;font-weight:700;fill:white}.sub{font-size:24px;fill:#dfefff}.box{font-size:25px;font-weight:700}.small{font-size:20px}.arrow{stroke:#244a73;stroke-width:6;marker-end:url(#a)}
+</style><defs><marker id="a" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#244a73"/></marker></defs>
+<rect class="bg" width="1600" height="900"/><rect class="h" width="1600" height="110"/>
+<text class="title" x="55" y="65">Visão Geral — Negócio, BIAN 14, DDD e Arquitetura</text>
+<text class="sub" x="55" y="98">Controle de Fluxo de Caixa: do problema do comerciante até a solução executável</text>
+<rect class="b" x="65" y="165" rx="22" width="320" height="150"/><text class="t box" x="105" y="215">Necessidade</text><text class="t small" x="105" y="260">Registrar créditos/débitos</text><text class="t small" x="105" y="292">Consultar saldo diário</text>
+<rect class="y" x="465" y="165" rx="22" width="330" height="150"/><text class="t box" x="505" y="215">Capabilities do case</text><text class="t small" x="505" y="260">Financial Entry Management</text><text class="t small" x="505" y="292">Financial Position Management</text>
+<rect class="g" x="875" y="165" rx="22" width="300" height="150"/><text class="t box" x="915" y="215">BIAN 14</text><text class="t small" x="915" y="260">Service Domain</text><text class="t small" x="915" y="292">Position Keeping</text>
+<rect class="p" x="1255" y="165" rx="22" width="280" height="150"/><text class="t box" x="1295" y="215">DDD</text><text class="t small" x="1295" y="260">Cash Flow /</text><text class="t small" x="1295" y="292">Position Keeping</text>
+<line class="arrow" x1="385" y1="240" x2="455" y2="240"/><line class="arrow" x1="795" y1="240" x2="865" y2="240"/><line class="arrow" x1="1175" y1="240" x2="1245" y2="240"/>
+<rect class="w" x="120" y="400" rx="25" width="1360" height="360" stroke="#b9cde4" stroke-width="2"/>
+<text class="t box" x="170" y="455">Como isso vira software</text>
+<rect class="b" x="170" y="510" rx="18" width="300" height="150"/><text class="t box" x="210" y="560">transaction-service</text><text class="t small" x="210" y="605">Command / write side</text><text class="t small" x="210" y="635">Lançamentos + Outbox</text>
+<rect class="g" x="650" y="510" rx="18" width="300" height="150"/><text class="t box" x="690" y="560">RabbitMQ</text><text class="t small" x="690" y="605">Eventos assíncronos</text><text class="t small" x="690" y="635">CloudEvents</text>
+<rect class="p" x="1130" y="510" rx="18" width="300" height="150"/><text class="t box" x="1170" y="560">consolidation-service</text><text class="t small" x="1170" y="605">Read / projection side</text><text class="t small" x="1170" y="635">DailyBalance</text>
+<line class="arrow" x1="470" y1="585" x2="640" y2="585"/><line class="arrow" x1="950" y1="585" x2="1120" y2="585"/>
+<text class="t small" x="170" y="720">BIAN é referência semântica; DDD define a fronteira do modelo; os dois serviços são deployables do mesmo Bounded Context.</text>
+</svg>
