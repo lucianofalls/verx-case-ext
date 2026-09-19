@@ -179,7 +179,7 @@ As figuras abaixo resumem as decisões principais do case. Elas são complementa
 
 ---
 
-## 7. Padrões aplicados
+## 6. Padrões aplicados
 
 ### Hexagonal / Ports & Adapters
 
