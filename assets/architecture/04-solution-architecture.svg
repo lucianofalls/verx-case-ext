@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="1280" viewBox="0 0 1400 1280">
+<defs>
+ <linearGradient id="b" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#edf7ff"/><stop offset="1" stop-color="#dcefff"/></linearGradient>
+ <linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#effcf6"/><stop offset="1" stop-color="#dcf6e9"/></linearGradient>
+ <linearGradient id="panel" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#ffffff"/><stop offset="1" stop-color="#f7fbff"/></linearGradient>
+ <filter id="s"><feDropShadow dx="0" dy="7" stdDeviation="8" flood-opacity=".13"/></filter>
+ <marker id="a" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#1477da"/></marker>
+</defs>
+<rect width="1400" height="1280" fill="#fbfdff"/>
+<text x="55" y="70" font-family="Arial" font-size="50" font-weight="700" fill="#102f60">Arquitetura ponta a ponta da solução</text>
+<text x="55" y="112" font-family="Arial" font-size="25" fill="#60738b">Registro de lançamentos, consolidação assíncrona, segurança e observabilidade</text>
+
+<!-- lane headers -->
+<rect x="35" y="155" width="290" height="730" rx="28" fill="url(#b)"/>
+<rect x="345" y="155" width="420" height="730" rx="28" fill="url(#b)"/>
+<rect x="785" y="155" width="580" height="730" rx="28" fill="url(#g)"/>
+<circle cx="75" cy="195" r="24" fill="#1976d2"/><text x="75" y="203" text-anchor="middle" font-family="Arial" font-size="23" font-weight="700" fill="white">1</text>
+<text x="115" y="202" font-family="Arial" font-size="27" font-weight="700" fill="#123565">Consumo e segurança</text>
+<circle cx="385" cy="195" r="24" fill="#1976d2"/><text x="385" y="203" text-anchor="middle" font-family="Arial" font-size="23" font-weight="700" fill="white">2</text>
+<text x="425" y="202" font-family="Arial" font-size="27" font-weight="700" fill="#123565">Write side</text>
+<circle cx="825" cy="195" r="24" fill="#139968"/><text x="825" y="203" text-anchor="middle" font-family="Arial" font-size="23" font-weight="700" fill="white">3</text>
+<text x="865" y="202" font-family="Arial" font-size="27" font-weight="700" fill="#123565">Mensageria e processamento assíncrono</text>
+
+<!-- client -->
+<g filter="url(#s)"><rect x="70" y="270" width="220" height="160" rx="20" fill="url(#panel)" stroke="#84b6e8" stroke-width="2"/></g>
+<circle cx="180" cy="320" r="28" fill="#2488ee"/><path d="M135 390 Q180 345 225 390" fill="#2488ee"/>
+<text x="180" y="412" text-anchor="middle" font-family="Arial" font-size="22" font-weight="700" fill="#123565">API Consumer</text>
+
+<!-- idp -->
+<g filter="url(#s)"><rect x="70" y="530" width="220" height="190" rx="20" fill="url(#panel)" stroke="#72c9b4" stroke-width="2"/></g>
+<path d="M180 565 l55 18 v48 c0 42-25 71-55 88-30-17-55-46-55-88v-48z" fill="#16a381"/>
+<circle cx="180" cy="617" r="18" fill="white"/><rect x="173" y="616" width="14" height="45" rx="7" fill="white"/>
+<text x="180" y="687" text-anchor="middle" font-family="Arial" font-size="22" font-weight="700" fill="#123565">OAuth2 / OIDC</text>
+
+<!-- tx svc -->
+<g filter="url(#s)"><rect x="420" y="270" width="270" height="155" rx="20" fill="url(#panel)" stroke="#74ade5" stroke-width="2"/></g>
+<rect x="515" y="295" width="80" height="70" rx="16" fill="#2188ef"/><text x="555" y="343" text-anchor="middle" font-family="Arial" font-size="38" fill="white">⚙</text>
+<text x="555" y="395" text-anchor="middle" font-family="Arial" font-size="22" font-weight="700" fill="#123565">transaction-service</text>
+
+<!-- tx db -->
+<g filter="url(#s)"><rect x="390" y="485" width="150" height="175" rx="18" fill="url(#panel)" stroke="#7faee0" stroke-width="2"/><rect x="570" y="485" width="160" height="175" rx="18" fill="url(#panel)" stroke="#7faee0" stroke-width="2"/></g>
+<ellipse cx="465" cy="530" rx="45" ry="17" fill="#176fc3"/><rect x="420" y="530" width="90" height="58" fill="#176fc3"/><ellipse cx="465" cy="588" rx="45" ry="17" fill="#176fc3"/>
+<text x="465" y="628" text-anchor="middle" font-family="Arial" font-size="19" font-weight="700" fill="#123565">transactions</text>
+<ellipse cx="650" cy="530" rx="45" ry="17" fill="#176fc3"/><rect x="605" y="530" width="90" height="58" fill="#176fc3"/><ellipse cx="650" cy="588" rx="45" ry="17" fill="#176fc3"/>
+<text x="650" y="628" text-anchor="middle" font-family="Arial" font-size="19" font-weight="700" fill="#123565">outbox_event</text>
+<rect x="450" y="700" width="220" height="55" rx="16" fill="#dbeafe"/><text x="560" y="735" text-anchor="middle" font-family="Arial" font-size="19" font-weight="700" fill="#175fae">Transactional Outbox</text>
+
+<!-- mq -->
+<g filter="url(#s)"><rect x="820" y="410" width="190" height="160" rx="20" fill="url(#panel)" stroke="#62c2aa" stroke-width="2"/></g>
+<rect x="875" y="442" width="80" height="65" rx="14" fill="#11a383"/><text x="915" y="487" text-anchor="middle" font-family="Arial" font-size="34" fill="white">☰</text>
+<text x="915" y="542" text-anchor="middle" font-family="Arial" font-size="23" font-weight="700" fill="#123565">RabbitMQ</text>
+
+<!-- consolidation -->
+<g filter="url(#s)"><rect x="1070" y="310" width="250" height="155" rx="20" fill="url(#panel)" stroke="#62c2aa" stroke-width="2"/></g>
+<rect x="1155" y="335" width="80" height="68" rx="15" fill="#2188ef"/><text x="1195" y="382" text-anchor="middle" font-family="Arial" font-size="38" fill="white">⚙</text>
+<text x="1195" y="440" text-anchor="middle" font-family="Arial" font-size="21" font-weight="700" fill="#123565">consolidation-service</text>
+
+<!-- read db -->
+<g filter="url(#s)"><rect x="1080" y="545" width="230" height="190" rx="20" fill="url(#panel)" stroke="#62c2aa" stroke-width="2"/></g>
+<ellipse cx="1195" cy="590" rx="48" ry="18" fill="#176fc3"/><rect x="1147" y="590" width="96" height="62" fill="#176fc3"/><ellipse cx="1195" cy="652" rx="48" ry="18" fill="#176fc3"/>
+<text x="1195" y="690" text-anchor="middle" font-family="Arial" font-size="19" font-weight="700" fill="#123565">daily_balance</text><text x="1195" y="715" text-anchor="middle" font-family="Arial" font-size="17" fill="#51677f">processed_event</text>
+
+<!-- arrows -->
+<line x1="290" y1="350" x2="410" y2="350" stroke="#1477da" stroke-width="5" marker-end="url(#a)"/><text x="330" y="335" font-family="Arial" font-size="18" fill="#1477da">JWT</text>
+<line x1="555" y1="425" x2="465" y2="475" stroke="#1477da" stroke-width="5" marker-end="url(#a)"/>
+<line x1="575" y1="425" x2="650" y2="475" stroke="#1477da" stroke-width="5" marker-end="url(#a)"/>
+<line x1="730" y1="570" x2="810" y2="500" stroke="#1477da" stroke-width="5" marker-end="url(#a)"/>
+<line x1="1010" y1="490" x2="1060" y2="390" stroke="#1477da" stroke-width="5" marker-end="url(#a)"/>
+<line x1="1195" y1="465" x2="1195" y2="535" stroke="#1477da" stroke-width="5" marker-end="url(#a)"/>
+<line x1="180" y1="430" x2="180" y2="520" stroke="#139968" stroke-width="4" stroke-dasharray="10 7"/>
+
+<!-- observability -->
+<rect x="35" y="915" width="1330" height="215" rx="28" fill="#edf5ff"/>
+<circle cx="75" cy="960" r="24" fill="#1976d2"/><text x="75" y="968" text-anchor="middle" font-family="Arial" font-size="23" font-weight="700" fill="white">4</text>
+<text x="115" y="967" font-family="Arial" font-size="27" font-weight="700" fill="#123565">Observabilidade</text>
+<g filter="url(#s)"><rect x="420" y="975" width="260" height="105" rx="18" fill="white" stroke="#84b6e8" stroke-width="2"/><rect x="860" y="975" width="220" height="105" rx="18" fill="white" stroke="#84b6e8" stroke-width="2"/></g>
+<text x="550" y="1020" text-anchor="middle" font-family="Arial" font-size="21" font-weight="700" fill="#123565">OpenTelemetry Collector</text><text x="550" y="1052" text-anchor="middle" font-family="Arial" font-size="17" fill="#60738b">traces · métricas · logs</text>
+<text x="970" y="1020" text-anchor="middle" font-family="Arial" font-size="24" font-weight="700" fill="#123565">Jaeger</text><text x="970" y="1052" text-anchor="middle" font-family="Arial" font-size="17" fill="#60738b">visualização de traces</text>
+<line x1="680" y1="1027" x2="850" y2="1027" stroke="#1477da" stroke-width="5" marker-end="url(#a)"/>
+
+<!-- guarantees -->
+<rect x="35" y="1155" width="1330" height="95" rx="22" fill="#f8fbff" stroke="#c9dff5"/>
+<text x="80" y="1195" font-family="Arial" font-size="24" font-weight="700" fill="#123565">Garantias:</text>
+<text x="220" y="1195" font-family="Arial" font-size="19" fill="#36516f">lançamentos independentes da consolidação</text>
+<text x="600" y="1195" font-family="Arial" font-size="19" fill="#36516f">• publicação confiável via Outbox</text>
+<text x="910" y="1195" font-family="Arial" font-size="19" fill="#36516f">• consumer idempotente</text>
+<text x="1160" y="1195" font-family="Arial" font-size="19" fill="#36516f">• rastreabilidade</text>
+</svg>
