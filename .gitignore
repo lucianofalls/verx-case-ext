@@ -1,0 +1,19 @@
+# Build outputs
+**/target/
+*.class
+
+# Local editor and operating-system files
+.idea/
+.vscode/
+*.iml
+.DS_Store
+
+# Local credentials and environment configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Runtime and tool logs
+*.log

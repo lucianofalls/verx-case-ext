@@ -1,0 +1,183 @@
+name: Performance validation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'performance-tests/**'
+      - 'consolidation-service/**'
+      - 'transaction-service/**'
+      - 'compose.yaml'
+      - 'scripts/**'
+      - '.github/workflows/performance.yml'
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: 'Performance profile'
+        required: true
+        default: 'baseline'
+        type: choice
+        options:
+          - baseline
+          - peak
+          - stress
+
+jobs:
+  performance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare local environment
+        run: |
+          sh scripts/setup-local-env.sh
+
+      - name: Start stack
+        run: |
+          set -eu
+          attempt=1
+          while [ "$attempt" -le 3 ]; do
+            if docker compose up -d --build; then
+              exit 0
+            fi
+            echo "docker compose start attempt $attempt failed"
+            docker compose down --remove-orphans || true
+            attempt=$((attempt + 1))
+            sleep 15
+          done
+          exit 1
+
+      - name: Wait for APIs
+        run: |
+          set -eu
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8081/actuator/health >/dev/null \
+              && curl -fsS http://127.0.0.1:8082/actuator/health >/dev/null; then
+              exit 0
+            fi
+            sleep 5
+          done
+          docker compose ps
+          docker compose logs --tail=200 transaction-service consolidation-service mock-idp
+          exit 1
+
+      - name: Obtain OAuth token
+        run: |
+          set -eu
+          TOKEN="$(sh scripts/get-local-token.sh | python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')"
+          test -n "$TOKEN"
+          echo "TOKEN=$TOKEN" >> "$GITHUB_ENV"
+
+      - name: Select profile
+        id: profile
+        env:
+          INPUT_PROFILE: ${{ github.event.inputs.profile }}
+        run: |
+          set -eu
+          PROFILE="${INPUT_PROFILE:-baseline}"
+          case "$PROFILE" in
+            baseline)
+              RATE=50
+              DURATION=5m
+              ;;
+            peak)
+              RATE=75
+              DURATION=2m
+              ;;
+            stress)
+              RATE=100
+              DURATION=1m
+              ;;
+            *)
+              echo "Unsupported profile: $PROFILE" >&2
+              exit 2
+              ;;
+          esac
+          echo "profile=$PROFILE" >> "$GITHUB_OUTPUT"
+          echo "rate=$RATE" >> "$GITHUB_OUTPUT"
+          echo "duration=$DURATION" >> "$GITHUB_OUTPUT"
+
+      - name: Run k6
+        env:
+          PROFILE: ${{ steps.profile.outputs.profile }}
+          RATE: ${{ steps.profile.outputs.rate }}
+          DURATION: ${{ steps.profile.outputs.duration }}
+        run: |
+          set -eu
+          mkdir -p build/performance
+          docker run --rm --network host \
+            --user "$(id -u):$(id -g)" \
+            -e TOKEN="$TOKEN" \
+            -e RATE="$RATE" \
+            -e DURATION="$DURATION" \
+            -e TRANSACTION_URL=http://127.0.0.1:8081 \
+            -e CONSOLIDATION_URL=http://127.0.0.1:8082 \
+            -v "$PWD/performance-tests/k6:/scripts:ro" \
+            -v "$PWD/build/performance:/results" \
+            grafana/k6:latest run \
+              --summary-export="/results/k6-$PROFILE.json" \
+              /scripts/daily-balance.js \
+            | tee "build/performance/k6-$PROFILE.log"
+
+      - name: Write performance summary
+        if: always()
+        env:
+          PROFILE: ${{ steps.profile.outputs.profile }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          profile = os.environ.get("PROFILE") or "baseline"
+          path = Path("build/performance") / f"k6-{profile}.json"
+          summary = Path(os.environ["GITHUB_STEP_SUMMARY"])
+
+          if not path.exists():
+              summary.write_text(
+                  f"# Performance — {profile}\n\nERROR: k6 summary file was not produced.\n",
+                  encoding="utf-8",
+              )
+              raise SystemExit("k6 summary evidence was not produced")
+
+          data = json.loads(path.read_text(encoding="utf-8"))
+          metrics = data.get("metrics", {})
+
+          def metric(name, key, default="n/a"):
+              return metrics.get(name, {}).get("values", {}).get(key, default)
+
+          rows = [
+              ("requests", metric("http_reqs", "count")),
+              ("achieved req/s", metric("http_reqs", "rate")),
+              ("failure rate", metric("http_req_failed", "rate")),
+              ("p95 ms", metric("http_req_duration", "p(95)")),
+              ("p99 ms", metric("http_req_duration", "p(99)")),
+              ("dropped iterations", metric("dropped_iterations", "count")),
+              ("checks rate", metric("checks", "rate")),
+          ]
+
+          lines = [f"# Performance — {profile}", "", "| Metric | Value |", "|---|---:|"]
+          lines += [f"| {name} | {value} |" for name, value in rows]
+          summary.write_text("\n".join(lines) + "\n", encoding="utf-8")
+          PY
+
+      - name: Upload performance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-${{ steps.profile.outputs.profile }}
+          path: build/performance/
+          if-no-files-found: warn
+
+      - name: Show diagnostics on failure
+        if: failure()
+        run: |
+          docker compose ps
+          docker compose logs --tail=300 transaction-service consolidation-service rabbitmq mock-idp
+
+      - name: Stop stack
+        if: always()
+        run: docker compose down -v

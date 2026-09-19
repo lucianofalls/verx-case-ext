@@ -1,0 +1,107 @@
+name: E2E phased validation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'transaction-service/**'
+      - 'consolidation-service/**'
+      - 'infrastructure/local/**'
+      - 'scripts/**'
+      - 'compose.yaml'
+      - '.github/workflows/e2e.yml'
+  workflow_dispatch:
+
+jobs:
+  phase1-and-phase2:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Phase 1 - prepare environment
+        run: sh scripts/setup-local-env.sh
+
+      - name: Phase 1 - start stack with retry
+        run: |
+          set -eu
+          attempt=1
+          while [ "$attempt" -le 3 ]; do
+            if docker compose up -d --build; then
+              exit 0
+            fi
+            echo "docker compose start attempt $attempt failed"
+            docker compose down --remove-orphans || true
+            attempt=$((attempt + 1))
+            sleep 15
+          done
+          exit 1
+
+      - name: Phase 1 - wait for application health
+        run: sh scripts/verify-local.sh
+
+      - name: Phase 1 - validate observability containers
+        run: |
+          set -eu
+          docker compose ps
+          docker compose ps --status running --services | grep -qx 'otel-collector'
+          docker compose ps --status running --services | grep -qx 'jaeger'
+          curl -fsS http://127.0.0.1:16686/ >/dev/null
+
+      - name: Phase 1 - obtain OAuth token
+        run: |
+          set -eu
+          TOKEN="$(sh scripts/get-local-token.sh | python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')"
+          test -n "$TOKEN"
+          echo "TOKEN=$TOKEN" >> "$GITHUB_ENV"
+
+      - name: Phase 1 - validate authentication
+        run: |
+          set -eu
+          code_without_token="$(curl -sS -o /dev/null -w '%{http_code}'             'http://127.0.0.1:8081/v1/transactions?merchantId=AUTH-CHECK')"
+          test "$code_without_token" = "401"
+
+          code_with_token="$(curl -sS -o /dev/null -w '%{http_code}'             -H "Authorization: Bearer $TOKEN"             'http://127.0.0.1:8081/v1/transactions?merchantId=AUTH-CHECK')"
+          test "$code_with_token" = "200"
+
+      - name: Phase 2 - validate full business flow
+        run: sh scripts/verify-e2e.sh
+
+      - name: Phase 3 - validate service outage and recovery
+        run: sh scripts/verify-consolidation-resilience.sh
+
+      - name: Phase 4 - validate consolidation database outage and recovery
+        run: sh scripts/verify-consolidation-db-resilience.sh
+
+      - name: Phase 5 - validate immutable reversal flow
+        run: sh scripts/verify-reversal.sh
+
+      - name: Phase 6 - reconcile source transactions and daily projections
+        run: sh scripts/reconcile-balances.sh
+
+      - name: Phase 2/6 - capture business logs
+        if: always()
+        run: |
+          mkdir -p build/e2e
+          docker compose logs --no-color transaction-service consolidation-service             | grep 'business_event=' > build/e2e/business-events.log || true
+          docker compose logs --no-color otel-collector jaeger             > build/e2e/observability.log || true
+
+      - name: Upload E2E evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-evidence
+          path: build/e2e/
+          if-no-files-found: warn
+
+      - name: Diagnostics
+        if: failure()
+        run: |
+          docker compose ps
+          docker compose logs --tail=300 transaction-service consolidation-service rabbitmq mock-idp otel-collector jaeger
+
+      - name: Stop stack
+        if: always()
+        run: docker compose down -v
