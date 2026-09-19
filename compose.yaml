@@ -1,0 +1,126 @@
+name: verx-case
+services:
+  postgres:
+    image: public.ecr.aws/docker/library/postgres:16.13
+    environment:
+      POSTGRES_DB: cashflow
+      POSTGRES_USER: cashflow_admin
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run scripts/setup-local-env.sh}
+      TRANSACTION_DB_PASSWORD: ${TRANSACTION_DB_PASSWORD:?Run scripts/setup-local-env.sh}
+      CONSOLIDATION_DB_PASSWORD: ${CONSOLIDATION_DB_PASSWORD:?Run scripts/setup-local-env.sh}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infrastructure/local/postgres/01-create-schemas.sh:/docker-entrypoint-initdb.d/01-create-schemas.sh:ro
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U cashflow_admin -d cashflow"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@verex.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:?Run scripts/setup-local-env.sh}
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    ports:
+      - "127.0.0.1:${PGADMIN_PORT:-5050}:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      - ./infrastructure/local/pgadmin/servers.json:/pgadmin4/servers.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  rabbitmq:
+    image: public.ecr.aws/docker/library/rabbitmq:4.1-management
+    ports:
+      - "127.0.0.1:${RABBITMQ_PORT:-5672}:5672"
+      - "127.0.0.1:${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: [CMD, rabbitmq-diagnostics, -q, ping]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  jaeger:
+    image: cr.jaegertracing.io/jaegertracing/jaeger:2.21.0
+    ports:
+      - "127.0.0.1:${JAEGER_UI_PORT:-16686}:16686"
+
+  otel-collector:
+    image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.161.0
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./infrastructure/local/otel/collector.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - "127.0.0.1:${OTEL_GRPC_PORT:-4317}:4317"
+      - "127.0.0.1:${OTEL_HTTP_PORT:-4318}:4318"
+    depends_on:
+      jaeger:
+        condition: service_started
+
+  mock-idp:
+    image: ghcr.io/navikt/mock-oauth2-server:2.1.10
+    environment:
+      SERVER_PORT: 18080
+      JSON_CONFIG: >-
+        {"tokenCallbacks":[{"issuerId":"default","requestMappings":[{"requestParam":"scope","match":"transactions:write transactions:read balances:read","claims":{"sub":"cashflow-cli","scope":["transactions:write","transactions:read","balances:read"]}}]}]}
+    ports:
+      - "127.0.0.1:${MOCK_IDP_PORT:-18080}:18080"
+  transaction-service:
+    build:
+      context: .
+      args:
+        SERVICE: transaction-service
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/cashflow?currentSchema=transactions
+      DB_USER: transaction_app
+      DB_PASSWORD: ${TRANSACTION_DB_PASSWORD:?Run scripts/setup-local-env.sh}
+      SECURITY_ENABLED: "true"
+      JWT_ISSUER_URI: http://mock-idp:18080/default
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318/v1/traces
+    ports:
+      - "127.0.0.1:${TRANSACTION_PORT:-8081}:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      mock-idp:
+        condition: service_started
+      otel-collector:
+        condition: service_started
+  consolidation-service:
+    build:
+      context: .
+      args:
+        SERVICE: consolidation-service
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/cashflow?currentSchema=consolidation
+      DB_USER: consolidation_app
+      DB_PASSWORD: ${CONSOLIDATION_DB_PASSWORD:?Run scripts/setup-local-env.sh}
+      SECURITY_ENABLED: "true"
+      JWT_ISSUER_URI: http://mock-idp:18080/default
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318/v1/traces
+    ports:
+      - "127.0.0.1:${CONSOLIDATION_PORT:-8082}:8082"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      mock-idp:
+        condition: service_started
+      otel-collector:
+        condition: service_started
+volumes:
+  postgres_data:
+  pgadmin_data:
+  rabbitmq_data:
