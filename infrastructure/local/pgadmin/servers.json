@@ -1,0 +1,13 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "Verex Cashflow",
+      "Group": "Local",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "cashflow",
+      "Username": "cashflow_admin",
+      "SSLMode": "prefer"
+    }
+  }
+}
