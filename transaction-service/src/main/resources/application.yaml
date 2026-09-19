@@ -1,0 +1,68 @@
+server:
+  port: ${SERVER_PORT:8081}
+spring:
+  application:
+    name: transaction-service
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/cashflow?currentSchema=transactions}
+    username: ${DB_USER:transaction_app}
+    password: ${DB_PASSWORD}
+    hikari:
+      connection-timeout: 5000
+      maximum-pool-size: 5
+  flyway:
+    default-schema: transactions
+    schemas: transactions
+    create-schemas: false
+    clean-disabled: true
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      observation-enabled: true
+    listener:
+      simple:
+        auto-startup: false
+cashflow:
+  security:
+    enabled: ${SECURITY_ENABLED:false}
+    jwt-issuer-uri: ${JWT_ISSUER_URI:}
+  messaging:
+    exchange: cashflow.events
+    routing-key: financial.transaction.recorded
+    queue: financial.transactions.recorded
+  outbox:
+    fixed-delay-ms: ${OUTBOX_FIXED_DELAY_MS:1000}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING:1.0}
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318/v1/traces}
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+
+logging:
+  level:
+    root: INFO
+    org.springframework: WARN
+    org.apache: WARN
+    com.zaxxer.hikari: WARN
+  pattern:
+    console: "%d{HH:mm:ss.SSS} %-5level [${spring.application.name}] [trace=%X{traceId:-} span=%X{spanId:-}] %msg%n"
