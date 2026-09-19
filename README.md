@@ -1,54 +1,84 @@
 # verx-case-ext — Cash Flow / Position Keeping
 
-Implementação executável do case de arquitetura para **registro de lançamentos de crédito/débito** e **consulta de saldo diário consolidado**, com foco em disponibilidade, resiliência, consistência, observabilidade e validação de performance.
+Implementação executável do case de arquitetura para **registro de lançamentos de crédito/débito** e **consulta de saldo diário consolidado**.
 
-> Este repositório contém somente a aplicação, testes, automações de CI/CD e recursos necessários para execução local. A documentação arquitetural relevante está consolidada neste README.
+A solução foi desenhada para demonstrar, de forma reproduzível, os principais requisitos do desafio:
 
----
+- novos lançamentos continuam disponíveis mesmo se o consolidado estiver indisponível;
+- consolidação desacoplada e assíncrona;
+- idempotência no comando e no consumo de eventos;
+- consistência eventual controlada;
+- rastreabilidade e observabilidade;
+- validação automatizada de **50 req/s** no serviço de consolidado.
 
-## 1. Objetivo
-
-A solução atende dois fluxos principais:
-
-1. **Financial Entry Management** — registrar lançamentos financeiros de crédito e débito.
-2. **Financial Position Management** — consultar a posição diária consolidada por comerciante, data de negócio e moeda.
-
-O requisito de resiliência é tratado explicitamente: **a indisponibilidade do serviço de consolidação não deve impedir novos lançamentos**.
-
-O requisito de carga do consolidado é validado com **50 requisições por segundo**, usando k6 com `constant-arrival-rate`.
+> Este repositório público contém somente a aplicação, os testes, os workflows e a infraestrutura local necessária para execução. As decisões relevantes para avaliação estão consolidadas neste README.
 
 ---
 
-## 2. Referência de negócio — BIAN 14.0
+## 1. Visão de negócio
 
-A referência funcional utilizada é o **BIAN Service Landscape 14.0**, principalmente o Service Domain **Position Keeping**.
+O problema foi tratado primeiro como capacidade de negócio e depois traduzido para domínio e tecnologia.
 
-No contexto deste case, a relação é:
+![Visão de negócio do case em blocos](assets/architecture/01-bian-overview.svg)
+
+As capabilities utilizadas no case são:
+
+```text
+Merchant Cash Flow Management
+├── Financial Entry Management
+├── Financial Position Management
+└── Operational Resilience
+```
+
+Elas representam, respectivamente:
+
+- registrar e controlar movimentações financeiras;
+- consolidar e consultar a posição diária;
+- manter o fluxo de lançamento disponível mesmo durante falhas do read side.
+
+---
+
+## 2. Referência BIAN 14.0
+
+A referência funcional adotada é o **BIAN Service Landscape 14.0**, principalmente o Service Domain **Position Keeping**.
+
+![BIAN 14 aplicado ao case](assets/architecture/03-hexagonal-microservices.svg)
+
+A relação utilizada é:
 
 ```text
 Problema do cliente
-    ↓
-Merchant Cash Flow Management
-    ├── Financial Entry Management
-    └── Financial Position Management
-    ↓
-BIAN Position Keeping
+        ↓
+Capability Map do case
+        ↓
+Financial Entry Management
+Financial Position Management
+        ↓
+BIAN Service Landscape
+Account Management
+        ↓
+BIAN Service Domain
+Position Keeping
 ```
 
-`Position Keeping` é aderente ao problema porque cobre a manutenção de lançamentos financeiros de débito/crédito e da posição/saldo correspondente.
+`Position Keeping` é uma referência aderente porque trata da manutenção de lançamentos de débito/crédito e da posição financeira correspondente.
 
-O BIAN é usado como **referência semântica e funcional**. A solução não se declara “BIAN compliant” e não transforma automaticamente um BIAN Service Domain em microservice ou Bounded Context.
+O BIAN é utilizado como **referência semântica e funcional**. A implementação não é apresentada como “BIAN compliant” e não assume equivalência automática entre:
 
-Referência oficial:
+```text
+BIAN Service Domain
+≠ Microservice
+≠ DDD Bounded Context
+```
+
+Referências oficiais:
 
 - https://bian.org/deliverables/service-landscape/
 - https://bian.org/servicelandscape-14-0-0/object_14.html?object=34193
 
 ---
 
-## 3. DDD
-
-### Bounded Context
+## 3. DDD: do negócio para o modelo
 
 A solução utiliza um único Bounded Context candidato:
 
@@ -56,134 +86,93 @@ A solução utiliza um único Bounded Context candidato:
 Cash Flow / Position Keeping
 ```
 
-Dentro desse contexto existem dois deployables independentes:
+![Do negócio para a solução com DDD](assets/architecture/02-ddd.svg)
+
+### DDD estratégico
+
+Os dois serviços pertencem ao mesmo contexto semântico:
 
 ```text
 Cash Flow / Position Keeping
-    ├── transaction-service
-    └── consolidation-service
+├── transaction-service
+└── consolidation-service
 ```
 
-A separação física ocorre por necessidades diferentes de disponibilidade, processamento e escala; ela não implica dois Bounded Contexts.
+A separação física existe por necessidades distintas de disponibilidade, processamento e escala. **Dois deployables não significam dois Bounded Contexts.**
 
 ### DDD tático
 
 No write side:
 
-- **Aggregate Root:** `FinancialTransaction`
-- **Value Object:** `Money`
-- **Domain enum:** `TransactionType`
-- **Domain Event:** `FinancialTransactionRecorded`
-
-O lançamento é imutável. Correções são feitas por **lançamento compensatório**, nunca por UPDATE/DELETE do lançamento original.
+| Elemento | Implementação |
+|---|---|
+| Aggregate Root | `FinancialTransaction` |
+| Value Object | `Money` |
+| Enum de domínio | `TransactionType` |
+| Domain Event | `FinancialTransactionRecorded` |
 
 No read side:
 
-- `DailyBalance` é uma **projeção CQRS**, não a fonte de verdade.
+- `DailyBalance` é uma projeção CQRS;
+- não é a fonte de verdade;
+- pode ser reconstruída a partir dos lançamentos/eventos.
+
+Lançamentos financeiros são imutáveis. Uma correção é representada por **novo lançamento compensatório**, nunca por UPDATE/DELETE do lançamento original.
 
 ---
 
-## 4. Arquitetura
+## 4. Arquitetura da solução
 
-```mermaid
-flowchart LR
-    Client[API Consumer]
-    IdP[OAuth2 / OIDC]
-    Tx[transaction-service]
-    TxDb[(transactions schema)]
-    Outbox[(outbox_event)]
-    MQ[RabbitMQ]
-    Con[consolidation-service]
-    ConDb[(daily_balance / processed_event)]
-    OTel[OpenTelemetry Collector]
-    Jaeger[Jaeger]
+O desenho abaixo substitui a representação simplificada anterior e mostra o fluxo completo da aplicação.
 
-    Client -->|JWT| Tx
-    Client -->|JWT| Con
-    IdP -. issuer/JWKS .-> Tx
-    IdP -. issuer/JWKS .-> Con
-
-    Tx --> TxDb
-    Tx --> Outbox
-    Outbox --> MQ
-    MQ --> Con
-    Con --> ConDb
-
-    Tx --> OTel
-    Con --> OTel
-    OTel --> Jaeger
-```
+![Arquitetura ponta a ponta da solução](assets/architecture/04-solution-architecture.svg)
 
 ### Fluxo de escrita
 
 ```text
 POST /v1/transactions
-    ↓
+        ↓
 validação de domínio
-    ↓
+        ↓
 BEGIN
   INSERT financial_transaction
   INSERT outbox_event
 COMMIT
-    ↓
+        ↓
 HTTP 201
 ```
 
-O RabbitMQ não participa do commit HTTP.
+O broker **não participa do commit HTTP**.
+
+A confirmação de uma transação depende da persistência atômica do lançamento e do registro no Outbox.
 
 ### Fluxo assíncrono
 
 ```text
 outbox_event
-    ↓
+        ↓
 Outbox Publisher
-    ↓
+        ↓
 RabbitMQ
-    ↓
+        ↓
 FinancialTransactionRecorded.v1
-    ↓
+        ↓
 consolidation-service
-    ↓
-processed_event + daily_balance
+        ↓
+processed_event
+        ↓
+daily_balance
 ```
 
----
-
-## 5. Guia visual da arquitetura
-
-As figuras abaixo resumem as decisões principais do case. Elas são complementares ao texto e representam somente o estado final da solução entregue.
-
-### 5.1 Do negócio ao sistema — BIAN 14, DDD e solução
-
-![Visão geral do negócio, BIAN 14, DDD e arquitetura](assets/architecture/01-bian-overview.svg)
-
-### 5.2 DDD estratégico e tático
-
-![DDD estratégico e tático aplicado ao Cash Flow / Position Keeping](assets/architecture/02-ddd.svg)
-
-### 5.3 Arquitetura Hexagonal e microserviços
-
-![Arquitetura Hexagonal, Ports and Adapters e separação dos deployables](assets/architecture/03-hexagonal-microservices.svg)
-
-### 5.4 CQRS, eventos e Transactional Outbox
-
-![CQRS light, RabbitMQ e Transactional Outbox](assets/architecture/04-cqrs-outbox.svg)
-
-### 5.5 Persistência e projeções
-
-![Fonte de verdade, schemas PostgreSQL e DailyBalance](assets/architecture/05-data-projections.svg)
-
-### 5.6 Segurança, observabilidade e testes
-
-![OAuth2, OpenTelemetry, métricas, E2E e performance](assets/architecture/06-security-observability-tests.svg)
+Se o serviço de consolidação estiver indisponível, o registro de novos lançamentos continua funcionando.
 
 ---
 
-## 6. Padrões aplicados
+## 5. Padrões arquiteturais aplicados
 
 ### Hexagonal / Ports & Adapters
 
-Os serviços separam:
+Cada serviço organiza as responsabilidades em:
 
 ```text
 Adapters In
@@ -195,83 +184,279 @@ Ports
 Adapters Out
 ```
 
-A camada de aplicação não depende diretamente do adapter JDBC.
+REST, RabbitMQ e JDBC são detalhes de borda. A regra de domínio não é acoplada diretamente ao adapter de persistência.
 
-### CQRS leve
+### CQRS light
+
+A solução separa comando e consulta sem introduzir Event Sourcing:
 
 ```text
 Write model
 FinancialTransaction
-      ↓ evento
+        ↓ evento
 Read model
 DailyBalance
 ```
 
-Não foi adotado Event Sourcing porque não é necessário para os requisitos do case.
-
 ### Event-Driven Architecture
 
-A consolidação é desacoplada do lançamento por mensageria assíncrona.
+A consolidação é executada de forma assíncrona para desacoplar disponibilidade e escala do write side e do read side.
 
 ### Transactional Outbox
 
-`financial_transaction` e `outbox_event` são persistidos na mesma transação.
+`financial_transaction` e `outbox_event` são gravados na mesma transação PostgreSQL.
 
-Isso evita o dual-write:
+Isso elimina o dual-write clássico:
 
 ```text
 DB commit ✅
 broker publish ❌
 ```
 
-O evento só é marcado como publicado após confirmação do broker e ausência de retorno por rota inválida.
+O Outbox Publisher posteriormente publica no RabbitMQ. O evento somente é marcado como publicado após confirmação do broker e ausência de retorno por rota inválida.
 
 ### Idempotência
 
-Dois níveis:
+A aplicação possui proteção em dois pontos:
 
-- API: `Idempotency-Key`
-- consumer: `processed_event.event_id` único
+- API: `Idempotency-Key`;
+- consumer: `processed_event.event_id` único.
 
 ### Consistência eventual
 
-O lançamento é confirmado imediatamente após o commit.
+O lançamento é consistente após o commit.
 
-O consolidado converge de forma assíncrona.
+O consolidado é uma projeção assíncrona e converge após o processamento do evento.
 
 ---
 
-## 7. Resiliência
+## 6. Stack
 
-Se o serviço de consolidação ficar indisponível:
+| Componente | Tecnologia |
+|---|---|
+| Runtime | Java 21 |
+| Framework | Spring Boot 3 |
+| Banco | PostgreSQL 16 |
+| Broker | RabbitMQ 4.1 |
+| Auth | OAuth2/OIDC + JWT |
+| Arquitetura interna | Hexagonal / Ports & Adapters |
+| Integração | Event-Driven Architecture |
+| Consistência | Transactional Outbox + eventual consistency |
+| Observabilidade | Micrometer + OpenTelemetry + Jaeger |
+| Testes | JUnit + Mockito + Testcontainers |
+| Performance | k6 |
+| CI | GitHub Actions |
+
+---
+
+# Como executar
+
+## 7. Pré-requisitos
+
+Para a execução mais simples, utilizando Docker:
+
+- Docker;
+- Docker Compose;
+- `openssl`;
+- `curl`;
+- Python 3.
+
+> Java e Maven **não são necessários para subir a aplicação com Docker Compose**. Eles são necessários somente para desenvolvimento/build diretamente na máquina.
+
+Para executar o benchmark local de performance, também é necessário instalar o **k6**.
+
+---
+
+## 8. Quick start
+
+### 8.1 Clonar
+
+```bash
+git clone https://github.com/lucianofalls/verx-case-ext.git
+cd verx-case-ext
+```
+
+### 8.2 Gerar credenciais locais
+
+```bash
+sh scripts/setup-local-env.sh
+```
+
+O script cria:
+
+```text
+.env
+```
+
+com senhas aleatórias para PostgreSQL e pgAdmin.
+
+O arquivo é ignorado pelo Git.
+
+### 8.3 Subir toda a stack
+
+```bash
+docker compose up -d --build
+```
+
+Esse comando inicia:
+
+```text
+postgres
+pgadmin
+rabbitmq
+mock-idp
+transaction-service
+consolidation-service
+otel-collector
+jaeger
+```
+
+Na primeira execução, o Docker pode levar alguns minutos para baixar as imagens e compilar os serviços.
+
+### 8.4 Verificar os containers
+
+```bash
+docker compose ps
+```
+
+### 8.5 Validar health e banco
+
+```bash
+sh scripts/verify-local.sh
+```
+
+Resultado esperado:
+
+```text
+Service on port 8081: UP
+Service on port 8082: UP
+```
+
+Além dos health checks, o script valida a estrutura do PostgreSQL.
+
+---
+
+## 9. Obter token OAuth local
+
+O ambiente possui um IdP mock somente para permitir uma validação reproduzível.
+
+Execute:
+
+```bash
+TOKEN=$(sh scripts/get-local-token.sh \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')
+
+export TOKEN
+```
+
+O token possui os scopes:
+
+```text
+transactions:write
+transactions:read
+balances:read
+```
+
+---
+
+## 10. Validar o fluxo funcional completo
+
+Com a stack em execução e `TOKEN` exportado:
+
+```bash
+sh scripts/verify-e2e.sh
+```
+
+O teste:
+
+1. cria um `CREDIT 100.0000`;
+2. cria um `DEBIT 25.0000`;
+3. aguarda o consumo assíncrono;
+4. consulta o consolidado;
+5. valida:
+
+```text
+totalCredits = 100.0000
+totalDebits  = 25.0000
+balance      = 75.0000
+```
+
+Resultado esperado:
+
+```text
+[phase2] PASS
+```
+
+---
+
+## 11. Chamadas manuais da API
+
+### Criar lançamento
+
+```bash
+curl -X POST http://localhost:8081/v1/transactions \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: demo-credit-001" \
+  -d '{
+    "merchantId": "MERCHANT-001",
+    "type": "CREDIT",
+    "amount": "100.0000",
+    "currency": "BRL",
+    "description": "Demo transaction",
+    "occurredAt": "2026-09-18T15:00:00Z"
+  }'
+```
+
+### Consultar o saldo diário
+
+```bash
+curl \
+  -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:8082/v1/merchants/MERCHANT-001/daily-balances/2026-09-18?currency=BRL"
+```
+
+Como a consolidação é assíncrona, pode existir um pequeno intervalo entre o HTTP 201 da transação e a atualização do read model.
+
+---
+
+## 12. Testes de resiliência
+
+### Consolidation service indisponível
+
+```bash
+sh scripts/verify-consolidation-resilience.sh
+```
+
+Valida que:
 
 ```text
 consolidation-service DOWN
         ↓
 transaction-service continua aceitando lançamentos
         ↓
-transaction + outbox persistidos
+evento permanece disponível
         ↓
-RabbitMQ mantém backlog
+consolidation-service volta
         ↓
-consolidation-service retorna
-        ↓
-backlog é consumido
-        ↓
-daily_balance converge
+saldo converge
 ```
 
-Também existe validação automatizada para indisponibilidade temporária do PostgreSQL utilizado pelo `consolidation-service`.
+### PostgreSQL do read side indisponível
 
-O consumer utiliza retry limitado com backoff antes de DLQ.
+```bash
+sh scripts/verify-consolidation-db-resilience.sh
+```
+
+O teste bloqueia temporariamente o usuário do banco do consolidado, força uma falha transitória e confirma recuperação/convergência após a restauração.
 
 ---
 
-## 8. Reversão / estorno
+## 13. Reversão / estorno
 
-Um lançamento confirmado nunca é alterado.
+O lançamento original é preservado.
 
-A reversão gera um novo lançamento compensatório:
+A reversão cria um novo lançamento de tipo oposto:
 
 ```text
 Original
@@ -284,79 +469,108 @@ reversalOfTransactionId = <original>
 Saldo líquido = 0
 ```
 
+Validação automatizada:
+
+```bash
+sh scripts/verify-reversal.sh
+```
+
 Endpoint:
 
 ```http
 POST /v1/transactions/{transactionId}/reversals
 ```
 
-A operação também utiliza `Idempotency-Key`.
+---
+
+## 14. Reconciliação
+
+O write model é a fonte de verdade.
+
+Para comparar os lançamentos com a projeção:
+
+```bash
+sh scripts/reconcile-balances.sh
+```
+
+O job recalcula por:
+
+```text
+merchantId
+businessDate
+currency
+```
+
+e compara:
+
+```text
+SUM(CREDIT)
+SUM(DEBIT)
+CREDIT - DEBIT
+```
+
+com `daily_balance`.
+
+Qualquer divergência faz o script falhar.
 
 ---
 
-## 9. Persistência
+## 15. Performance — requisito de 50 req/s
 
-PostgreSQL 16 com um banco `cashflow` e dois schemas lógicos:
+O requisito é validado com k6 usando `constant-arrival-rate`.
 
-```text
-cashflow
-├── transactions
-│   ├── financial_transaction
-│   └── outbox_event
-│
-└── consolidation
-    ├── daily_balance
-    └── processed_event
+Isso garante que o teste mede **taxa real de chegada**, em vez de usar quantidade de usuários virtuais como aproximação.
+
+### Baseline
+
+```bash
+sh scripts/run-performance-tests.sh baseline
 ```
 
-Cada serviço usa usuário e ownership próprios.
+Gate:
 
-Precisão monetária:
+| Métrica | Critério |
+|---|---:|
+| Taxa | 50 req/s |
+| Duração | 5 min |
+| `http_req_failed` | < 5% |
+| checks | > 95% |
+| p95 | < 500 ms |
+| `dropped_iterations` | 0 |
 
-```text
-NUMERIC(19,4)
+Perfis adicionais:
+
+```bash
+sh scripts/run-performance-tests.sh peak
+sh scripts/run-performance-tests.sh stress
 ```
 
-O `businessDate` é derivado de `occurredAt` usando:
-
-```text
-America/Sao_Paulo
-```
+Esses perfis adicionais servem para observar margem de capacidade. O requisito do case continua sendo o baseline de 50 req/s.
 
 ---
 
-## 10. Segurança
+## 16. Observabilidade
 
-As APIs utilizam OAuth2 Resource Server / JWT.
-
-Scopes:
+Os serviços expõem:
 
 ```text
-transactions:write
-transactions:read
-balances:read
+/actuator/health
+/actuator/prometheus
+/actuator/metrics
 ```
 
-No ambiente local existe um IdP mock apenas para permitir execução reproduzível.
+A stack local inclui:
 
----
+- OpenTelemetry Collector;
+- Jaeger;
+- Micrometer;
+- logs com `traceId` e `spanId`.
 
-## 11. Observabilidade
-
-Implementado:
-
-- Spring Boot Actuator
-- Micrometer
-- Prometheus endpoint
-- OpenTelemetry
-- OpenTelemetry Collector
-- Jaeger
-- logs com `traceId` e `spanId`
-
-Métricas de negócio/operação incluem:
+Métricas customizadas relevantes:
 
 ```text
 cashflow_transactions_created_total
+
 cashflow_outbox_published_total
 cashflow_outbox_publish_errors_total
 cashflow_outbox_pending
@@ -370,197 +584,48 @@ cashflow_consolidation_lag_seconds
 cashflow_rabbitmq_queue_depth
 ```
 
----
+### Interfaces locais
 
-## 12. Reconciliação
-
-O write model é a fonte de verdade.
-
-O script:
-
-```bash
-sh scripts/reconcile-balances.sh
-```
-
-recalcula, a partir de `transactions.financial_transaction`:
-
-```text
-totalCredits
-totalDebits
-balance
-```
-
-e compara com `consolidation.daily_balance`.
-
-Qualquer divergência retorna erro.
-
----
-
-## 13. Stack
-
-| Componente | Tecnologia |
+| Componente | URL |
 |---|---|
-| Runtime | Java 21 |
-| Framework | Spring Boot 3 |
-| Banco | PostgreSQL 16 |
-| Broker | RabbitMQ 4 |
-| Auth | OAuth2/OIDC + JWT |
-| Arquitetura interna | Hexagonal / Ports & Adapters |
-| Integração | Event-Driven |
-| Consistência | Transactional Outbox + eventual consistency |
-| Observabilidade | Micrometer + OpenTelemetry + Jaeger |
-| Performance | k6 |
-| Testes | JUnit + Mockito + Testcontainers |
-| CI | GitHub Actions |
+| transaction-service | http://localhost:8081 |
+| consolidation-service | http://localhost:8082 |
+| pgAdmin | http://localhost:5050 |
+| RabbitMQ Management | http://localhost:15672 |
+| Jaeger | http://localhost:16686 |
 
 ---
 
-## 14. Pré-requisitos
+## 17. Persistência
 
-Para executar localmente:
-
-- Docker + Docker Compose
-- `openssl`
-- `curl`
-- Python 3 para os scripts de validação
-
-Java/Maven não são necessários para subir a aplicação via Docker; são necessários apenas para desenvolvimento local fora dos containers.
-
----
-
-## 15. Subir a aplicação
-
-### 1. Criar credenciais locais
-
-```bash
-sh scripts/setup-local-env.sh
-```
-
-Esse comando cria um arquivo `.env` local e ignorado pelo Git.
-
-### 2. Subir a stack
-
-```bash
-docker compose up -d --build
-```
-
-### 3. Validar health
-
-```bash
-sh scripts/verify-local.sh
-```
-
-### 4. Obter token OAuth
-
-```bash
-TOKEN=$(sh scripts/get-local-token.sh \
-  | python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')
-
-export TOKEN
-```
-
----
-
-## 16. Executar validação funcional
-
-Fluxo principal:
-
-```bash
-sh scripts/verify-e2e.sh
-```
-
-O cenário cria crédito e débito e aguarda a projeção até validar o saldo consolidado.
-
-### Resiliência — serviço de consolidação indisponível
-
-```bash
-sh scripts/verify-consolidation-resilience.sh
-```
-
-### Resiliência — banco do consolidado indisponível
-
-```bash
-sh scripts/verify-consolidation-db-resilience.sh
-```
-
-### Reversão imutável
-
-```bash
-sh scripts/verify-reversal.sh
-```
-
-### Reconciliação
-
-```bash
-sh scripts/reconcile-balances.sh
-```
-
----
-
-## 17. Performance — requisito de 50 req/s
-
-O teste usa k6 com `constant-arrival-rate`, evitando confundir número de usuários virtuais com taxa real de requisições.
-
-Baseline:
-
-```bash
-sh scripts/run-performance-tests.sh baseline
-```
-
-Critérios:
+O PostgreSQL usa um único banco `cashflow` com ownership lógico separado:
 
 ```text
-50 req/s
-5 minutos
-http_req_failed < 5%
-checks > 95%
-dropped_iterations = 0
-p95 < 500 ms
+cashflow
+├── transactions
+│   ├── financial_transaction
+│   └── outbox_event
+│
+└── consolidation
+    ├── daily_balance
+    └── processed_event
 ```
 
-Perfis adicionais:
+Precisão monetária:
 
-```bash
-sh scripts/run-performance-tests.sh peak
-sh scripts/run-performance-tests.sh stress
+```text
+NUMERIC(19,4)
 ```
 
-O gate contratual continua sendo o baseline de 50 req/s.
+O `businessDate` é derivado de `occurredAt` no timezone:
+
+```text
+America/Sao_Paulo
+```
 
 ---
 
-## 18. Pipelines
-
-Três workflows principais:
-
-### Build and tests
-
-```text
-mvn clean verify
-```
-
-Executa testes unitários e de integração com Java 21.
-
-### E2E phased validation
-
-Valida:
-
-```text
-1. ambiente / health / OAuth
-2. crédito + débito + saldo
-3. outage do consolidation-service
-4. outage do banco do consolidation-service
-5. reversão imutável
-6. reconciliação transaction store x read model
-```
-
-### Performance validation
-
-Executa automaticamente o baseline de 50 req/s e publica a evidência do k6 como artifact do GitHub Actions.
-
----
-
-## 19. Endpoints principais
+## 18. Endpoints principais
 
 ```http
 POST /v1/transactions
@@ -573,25 +638,81 @@ GET  /v1/merchants/{merchantId}/daily-balances/{date}?currency=BRL
 
 ---
 
-## 20. Interfaces locais
+## 19. GitHub Actions
 
-Após `docker compose up`:
+O repositório executa três gates principais.
 
-| Interface | URL |
-|---|---|
-| transaction-service | http://localhost:8081 |
-| consolidation-service | http://localhost:8082 |
-| pgAdmin | http://localhost:5050 |
-| RabbitMQ Management | http://localhost:15672 |
-| Jaeger | http://localhost:16686 |
+### Build and tests
+
+```text
+mvn clean verify
+```
+
+Inclui testes unitários e de integração.
+
+### E2E phased validation
+
+Valida:
+
+```text
+1. ambiente / health / OAuth
+2. crédito + débito + saldo
+3. outage do consolidation-service
+4. outage do PostgreSQL do consolidation-service
+5. reversão imutável
+6. reconciliação transaction store x read model
+```
+
+### Performance validation
+
+Executa o baseline de 50 req/s e publica evidências do k6 como artifact do GitHub Actions.
 
 ---
 
-## 21. Arquitetura alvo
+## 20. Troubleshooting rápido
 
-A aplicação foi mantida independente do provedor de cloud.
+### Ver logs dos serviços
 
-A topologia de produção prevista é Kubernetes gerenciado:
+```bash
+docker compose logs -f transaction-service consolidation-service
+```
+
+### Ver todos os containers
+
+```bash
+docker compose ps
+```
+
+### Recriar somente os serviços Java
+
+```bash
+docker compose up -d --build transaction-service consolidation-service
+```
+
+### Reiniciar do zero
+
+> Esse comando remove também os volumes locais e os dados do PostgreSQL/RabbitMQ.
+
+```bash
+docker compose down -v
+sh scripts/setup-local-env.sh
+docker compose up -d --build
+sh scripts/verify-local.sh
+```
+
+### Encerrar sem remover volumes
+
+```bash
+docker compose down
+```
+
+---
+
+## 21. Arquitetura alvo de produção
+
+A aplicação foi mantida independente de cloud.
+
+A topologia alvo utiliza Kubernetes gerenciado:
 
 ```text
 Azure
@@ -607,38 +728,32 @@ GKE
  + RabbitMQ gerenciado
 ```
 
-Azure Service Bus e Google Pub/Sub não são tratados como substitutos transparentes de RabbitMQ, pois exigiriam mudança no adapter/contrato de mensageria.
+Azure Service Bus e Google Pub/Sub não são considerados substitutos transparentes de RabbitMQ. Uma troca desse tipo exige nova decisão arquitetural e alteração do adapter de mensageria.
 
 ---
 
-## 22. Encerrar o ambiente
-
-```bash
-docker compose down -v
-```
-
----
-
-## Resumo
-
-A solução prioriza a relação direta entre requisito e decisão arquitetural:
+## 22. Resumo das decisões
 
 ```text
-lançamento precisa sobreviver à falha da consolidação
+Lançamento não pode depender da disponibilidade da consolidação
         ↓
-EDA + Transactional Outbox + RabbitMQ
+Event-Driven Architecture + Transactional Outbox + RabbitMQ
 
-consolidado precisa escalar leitura
+Consulta precisa ser independente do modelo de escrita
         ↓
-CQRS light + read model dedicado
+CQRS light + DailyBalance
 
-entrega pode ser at-least-once
+Entrega de mensagens é at-least-once
         ↓
-consumer idempotente
+Consumer idempotente
 
-domínio financeiro exige rastreabilidade
+Domínio financeiro exige rastreabilidade
         ↓
-lançamentos imutáveis + reversão compensatória + reconciliação
+Lançamentos imutáveis + reversão compensatória + reconciliação
+
+Requisito de pico precisa ser comprovável
+        ↓
+k6 constant-arrival-rate + pipeline de performance
 ```
 
-O objetivo é manter o desenho pequeno, executável e justificável, evitando complexidade sem requisito correspondente.
+O resultado é uma solução pequena, executável e verificável, mantendo a complexidade proporcional aos requisitos do case.
